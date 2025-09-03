@@ -1,0 +1,84 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "providers": {
+    "vllm": {
+      "name": "vLLM Local Inference",
+      "type": "openai",
+      "base_url": "http://localhost:8000/v1",
+      "models": [
+        {
+          "id": "qwen2.5-coder-32b-instruct",
+          "name": "Qwen 2.5 Coder 32B",
+          "context_window": 32768,
+          "default_max_tokens": 4096,
+          "supports_tools": true,
+          "extra_config": {
+            "gpu_memory_utilization": 0.9,
+            "max_model_len": 32768,
+            "tensor_parallel_size": 1,
+            "quantization": "awq",
+            "model_path": "/models/Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
+          }
+        },
+        {
+          "id": "mistral-7b-instruct",
+          "name": "Mistral 7B Instruct",
+          "context_window": 8192,
+          "default_max_tokens": 2048,
+          "supports_tools": false,
+          "extra_config": {
+            "gpu_memory_utilization": 0.85,
+            "max_model_len": 8192,
+            "model_path": "/models/mistralai/Mistral-7B-Instruct-v0.2"
+          }
+        },
+        {
+          "id": "deepseek-coder-33b",
+          "name": "DeepSeek Coder 33B",
+          "context_window": 16384,
+          "default_max_tokens": 4096,
+          "supports_tools": true,
+          "extra_config": {
+            "gpu_memory_utilization": 0.9,
+            "max_model_len": 16384,
+            "quantization": "gptq",
+            "model_path": "/models/deepseek-ai/deepseek-coder-33b-instruct"
+          }
+        }
+      ]
+    }
+  },
+  
+  "mcp": {
+    "vllm-server": {
+      "type": "stdio",
+      "command": "vllm-mcp-server",
+      "args": ["--model", "qwen2.5-coder-32b-instruct"],
+      "env": {
+        "VLLM_SERVER_URL": "http://localhost:8000",
+        "VLLM_GPU_MEMORY_UTILIZATION": "0.9",
+        "VLLM_ENABLE_CACHE": "true"
+      }
+    },
+    
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "sequential-thinking-server",
+      "args": ["--max-steps", "10"],
+      "env": {
+        "THINKING_MODEL": "vllm:qwen2.5-coder-32b-instruct"
+      }
+    }
+  },
+  
+  "performance": {
+    "vllm": {
+      "connection_pool_size": 10,
+      "request_timeout": 300,
+      "enable_metrics": true,
+      "metrics_port": 9090,
+      "cache_enabled": true,
+      "cache_size_mb": 1024
+    }
+  }
+}

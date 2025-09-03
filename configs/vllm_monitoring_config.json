@@ -1,0 +1,38 @@
+{
+  "id": "vllm-local",
+  "name": "vLLM Local",
+  "base_url": "http://localhost:8000/v1",
+  "type": "openai",
+  "extra_config": {
+    "gpu_memory_utilization": 0.9,
+    "max_model_len": 8192,
+    "max_num_seqs": 256,
+    "tensor_parallel_size": 1,
+    "quantization": "awq",
+    "model_path": "/models/llama-2-7b-chat-awq",
+    "enable_monitoring": true,
+    "metrics_config": {
+      "gpu_metrics_interval": "5s",
+      "system_metrics_interval": "10s",
+      "max_latency_threshold": "30s",
+      "max_gpu_utilization": 0.95,
+      "max_memory_usage": 17179869184,
+      "min_cache_hit_rate": 0.80,
+      "enable_prometheus": true,
+      "prometheus_port": 9090,
+      "prometheus_path": "/metrics",
+      "enable_logging": true,
+      "log_interval": "60s",
+      "enable_alerts": true
+    }
+  },
+  "models": [
+    {
+      "name": "llama-2-7b-chat",
+      "id": "llama-2-7b-chat",
+      "max_tokens": 4096,
+      "input_cost": 0,
+      "output_cost": 0
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+# Prometheus Configuration for Crush + vLLM Monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'crush-vllm'
+    environment: 'production'
+
+# Load alerting rules
+rule_files:
+  - "alerts.yml"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # vLLM metrics
+  - job_name: 'vllm'
+    static_configs:
+      - targets: ['localhost:8000']  # vLLM default metrics port
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    scrape_timeout: 3s
+    honor_labels: true
+    params:
+      format: ['prometheus']
+
+  # GPU metrics via DCGM exporter
+  - job_name: 'dcgm-exporter'
+    static_configs:
+      - targets: ['localhost:9400']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Node exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+    scrape_interval: 15s
+
+  # Crush application metrics (if available)
+  - job_name: 'crush-app'
+    static_configs:
+      - targets: ['localhost:8080']  # Adjust port as needed
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    honor_labels: true
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Optional: Redis metrics (if using for caching)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['localhost:9121']
+    scrape_interval: 15s
+
+# Storage configuration
+storage:
+  tsdb:
+    path: /prometheus/data
+    retention.time: 30d
+    retention.size: 50GB
+    wal-compression: true
+
+# Remote write for long-term storage (optional)
+# remote_write:
+#   - url: "https://your-remote-storage/api/v1/write"
+#     headers:
+#       Authorization: "Bearer YOUR_TOKEN"
+
+# Recording rules for pre-computed metrics
+recording_rules:
+  - name: vllm_performance_rules
+    interval: 30s
+    rules:
+      - record: vllm:token_throughput_rate5m
+        expr: rate(vllm_request_success_total[5m]) * on() rate(vllm_request_prompt_tokens_total[5m])
+      
+      - record: vllm:request_latency_p99_5m
+        expr: histogram_quantile(0.99, rate(vllm_request_duration_seconds_bucket[5m]))
+      
+      - record: vllm:request_latency_p95_5m
+        expr: histogram_quantile(0.95, rate(vllm_request_duration_seconds_bucket[5m]))
+      
+      - record: vllm:request_latency_p50_5m
+        expr: histogram_quantile(0.50, rate(vllm_request_duration_seconds_bucket[5m]))
+      
+      - record: vllm:gpu_utilization_avg
+        expr: avg(DCGM_FI_DEV_GPU_UTIL) by (gpu)
+      
+      - record: vllm:gpu_memory_usage_percent
+        expr: (DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_TOTAL) * 100
+      
+      - record: vllm:cache_hit_rate_5m
+        expr: rate(vllm_cache_hit_total[5m]) / (rate(vllm_cache_hit_total[5m]) + rate(vllm_cache_miss_total[5m]))
+      
+      - record: vllm:batch_size_avg_5m
+        expr: avg(vllm_batch_size) by (instance)

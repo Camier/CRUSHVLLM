@@ -1,0 +1,144 @@
+# Alertmanager Configuration for Crush + vLLM
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@crush.local'
+  smtp_auth_username: 'alerts@crush.local'
+  smtp_auth_password: 'your-email-password'
+
+# Alert routing configuration
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'default-receiver'
+  routes:
+    # Critical alerts get immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 5m
+
+    # GPU-specific alerts
+    - match:
+        service: gpu
+      receiver: 'gpu-alerts'
+      group_interval: 2m
+
+    # vLLM performance alerts
+    - match:
+        service: vllm
+      receiver: 'vllm-alerts'
+
+    # System alerts
+    - match:
+        service: system
+      receiver: 'system-alerts'
+
+# Alert receivers/destinations
+receivers:
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'devops@crush.local'
+        subject: '[ALERT] {{ .GroupLabels.service | title }} Alert'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}: {{ .Value }}{{ end }}
+          {{ end }}
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@crush.local,devops@crush.local'
+        subject: '[CRITICAL] {{ .GroupLabels.service | title }} Critical Alert'
+        body: |
+          🚨 CRITICAL ALERT 🚨
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Started: {{ .StartsAt }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}: {{ .Value }}{{ end }}
+          {{ end }}
+    
+    # Optional: Slack notifications for critical alerts
+    # slack_configs:
+    #   - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+    #     channel: '#alerts'
+    #     title: 'Critical Alert: {{ .GroupLabels.service | title }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+  - name: 'gpu-alerts'
+    email_configs:
+      - to: 'gpu-ops@crush.local'
+        subject: '[GPU] {{ .GroupLabels.alertname }} Alert'
+        body: |
+          GPU Alert Detected
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          GPU: {{ .Labels.gpu }}
+          Instance: {{ .Labels.instance }}
+          Severity: {{ .Labels.severity }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+
+  - name: 'vllm-alerts'
+    email_configs:
+      - to: 'ml-ops@crush.local'
+        subject: '[vLLM] {{ .GroupLabels.alertname }} Performance Alert'
+        body: |
+          vLLM Performance Alert
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Instance: {{ .Labels.instance }}
+          Severity: {{ .Labels.severity }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+          
+          Dashboard: http://localhost:3000/d/vllm-crush-dashboard
+
+  - name: 'system-alerts'
+    email_configs:
+      - to: 'sysadmin@crush.local'
+        subject: '[SYSTEM] {{ .GroupLabels.alertname }} System Alert'
+        body: |
+          System Resource Alert
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Instance: {{ .Labels.instance }}
+          Severity: {{ .Labels.severity }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+
+# Inhibition rules to prevent alert spam
+inhibit_rules:
+  # Inhibit warning alerts when critical alerts are firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+  # Inhibit GPU utilization warnings when GPU is down
+  - source_match:
+      alertname: 'GPUDown'
+    target_match:
+      service: 'gpu'
+    equal: ['gpu', 'instance']
+
+  # Inhibit high latency alerts when service is down
+  - source_match:
+      alertname: 'VLLMServiceDown'
+    target_match:
+      service: 'vllm'
+    equal: ['instance']

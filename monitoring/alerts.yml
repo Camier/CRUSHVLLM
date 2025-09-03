@@ -1,0 +1,295 @@
+# Alert Rules for Crush + vLLM Deployment
+groups:
+  - name: vllm_critical_alerts
+    interval: 30s
+    rules:
+      # High latency alert
+      - alert: VLLMHighLatency
+        expr: vllm:request_latency_p95_5m > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "vLLM P95 latency is high"
+          description: "vLLM P95 request latency is {{ $value }}s, above 5s threshold for more than 2 minutes."
+
+      - alert: VLLMVeryHighLatency
+        expr: vllm:request_latency_p99_5m > 10
+        for: 1m
+        labels:
+          severity: critical
+          service: vllm
+        annotations:
+          summary: "vLLM P99 latency is critically high"
+          description: "vLLM P99 request latency is {{ $value }}s, above 10s critical threshold."
+
+      # GPU utilization alerts
+      - alert: GPUHighUtilization
+        expr: vllm:gpu_utilization_avg > 95
+        for: 5m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "GPU utilization is very high"
+          description: "GPU {{ $labels.gpu }} utilization is {{ $value }}% for more than 5 minutes."
+
+      # GPU memory alerts
+      - alert: GPUHighMemoryUsage
+        expr: vllm:gpu_memory_usage_percent > 90
+        for: 3m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "GPU memory usage is high"
+          description: "GPU {{ $labels.gpu }} memory usage is {{ $value }}% for more than 3 minutes."
+
+      - alert: GPUCriticalMemoryUsage
+        expr: vllm:gpu_memory_usage_percent > 95
+        for: 1m
+        labels:
+          severity: critical
+          service: vllm
+        annotations:
+          summary: "GPU memory usage is critically high"
+          description: "GPU {{ $labels.gpu }} memory usage is {{ $value }}%, approaching OOM condition."
+
+      # Request failure rate
+      - alert: VLLMHighFailureRate
+        expr: rate(vllm_request_failure_total[5m]) / rate(vllm_request_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "vLLM request failure rate is high"
+          description: "vLLM request failure rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: VLLMCriticalFailureRate
+        expr: rate(vllm_request_failure_total[5m]) / rate(vllm_request_total[5m]) > 0.15
+        for: 1m
+        labels:
+          severity: critical
+          service: vllm
+        annotations:
+          summary: "vLLM request failure rate is critically high"
+          description: "vLLM request failure rate is {{ $value | humanizePercentage }}, indicating serious issues."
+
+      # Service availability
+      - alert: VLLMServiceDown
+        expr: up{job="vllm"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: vllm
+        annotations:
+          summary: "vLLM service is down"
+          description: "vLLM service on {{ $labels.instance }} has been down for more than 30 seconds."
+
+      # Token throughput
+      - alert: VLLMLowThroughput
+        expr: vllm:token_throughput_rate5m < 100
+        for: 5m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "vLLM token throughput is low"
+          description: "vLLM token throughput is {{ $value }} tokens/s, below 100 tokens/s threshold."
+
+      # Cache performance
+      - alert: VLLMLowCacheHitRate
+        expr: vllm:cache_hit_rate_5m < 0.7
+        for: 5m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "vLLM cache hit rate is low"
+          description: "vLLM cache hit rate is {{ $value | humanizePercentage }}, below 70% threshold."
+
+      # Queue depth
+      - alert: VLLMHighQueueDepth
+        expr: vllm_num_requests_waiting > 50
+        for: 3m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "vLLM request queue is deep"
+          description: "vLLM has {{ $value }} requests waiting in queue for more than 3 minutes."
+
+      - alert: VLLMCriticalQueueDepth
+        expr: vllm_num_requests_waiting > 100
+        for: 1m
+        labels:
+          severity: critical
+          service: vllm
+        annotations:
+          summary: "vLLM request queue is critically deep"
+          description: "vLLM has {{ $value }} requests waiting, indicating severe capacity issues."
+
+  - name: gpu_hardware_alerts
+    interval: 60s
+    rules:
+      # GPU temperature
+      - alert: GPUHighTemperature
+        expr: DCGM_FI_DEV_GPU_TEMP > 80
+        for: 2m
+        labels:
+          severity: warning
+          service: gpu
+        annotations:
+          summary: "GPU temperature is high"
+          description: "GPU {{ $labels.gpu }} temperature is {{ $value }}°C for more than 2 minutes."
+
+      - alert: GPUCriticalTemperature
+        expr: DCGM_FI_DEV_GPU_TEMP > 85
+        for: 30s
+        labels:
+          severity: critical
+          service: gpu
+        annotations:
+          summary: "GPU temperature is critically high"
+          description: "GPU {{ $labels.gpu }} temperature is {{ $value }}°C, approaching thermal throttling."
+
+      # GPU power
+      - alert: GPUHighPowerDraw
+        expr: DCGM_FI_DEV_POWER_USAGE > 400
+        for: 5m
+        labels:
+          severity: warning
+          service: gpu
+        annotations:
+          summary: "GPU power draw is high"
+          description: "GPU {{ $labels.gpu }} power usage is {{ $value }}W for more than 5 minutes."
+
+      # GPU errors
+      - alert: GPUErrors
+        expr: increase(DCGM_FI_DEV_XID_ERRORS[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: gpu
+        annotations:
+          summary: "GPU hardware errors detected"
+          description: "GPU {{ $labels.gpu }} has reported {{ $value }} XID errors in the last 5 minutes."
+
+  - name: system_resource_alerts
+    interval: 60s
+    rules:
+      # System memory
+      - alert: HighSystemMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 3m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "System memory usage is high"
+          description: "System memory usage is {{ $value }}% on {{ $labels.instance }}."
+
+      - alert: CriticalSystemMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 1m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "System memory usage is critically high"
+          description: "System memory usage is {{ $value }}% on {{ $labels.instance }}, approaching OOM."
+
+      # CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "CPU usage is high"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }} for more than 5 minutes."
+
+      # Disk usage
+      - alert: HighDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "Disk usage is high"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }}:{{ $labels.device }}."
+
+      - alert: CriticalDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 95
+        for: 1m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Disk usage is critically high"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }}:{{ $labels.device }}, approaching full."
+
+  - name: application_alerts
+    interval: 30s
+    rules:
+      # Crush application health
+      - alert: CrushServiceDown
+        expr: up{job="crush-app"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: crush
+        annotations:
+          summary: "Crush application is down"
+          description: "Crush application on {{ $labels.instance }} has been down for more than 30 seconds."
+
+      # Model loading performance
+      - alert: SlowModelLoading
+        expr: vllm_model_loading_time_seconds > 300
+        for: 0s
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "Model loading is slow"
+          description: "vLLM model loading took {{ $value }}s, which is longer than expected."
+
+      # Time to first token
+      - alert: HighTimeToFirstToken
+        expr: avg(vllm_time_to_first_token_seconds) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "Time to first token is high"
+          description: "Average time to first token is {{ $value }}s for more than 3 minutes."
+
+  - name: performance_degradation_alerts
+    interval: 60s
+    rules:
+      # Batch efficiency
+      - alert: LowBatchEfficiency
+        expr: vllm:batch_size_avg_5m < 4
+        for: 10m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "vLLM batch efficiency is low"
+          description: "Average batch size is {{ $value }}, indicating suboptimal batching efficiency."
+
+      # Throughput degradation
+      - alert: ThroughputDegradation
+        expr: (vllm:token_throughput_rate5m offset 1h) / vllm:token_throughput_rate5m > 1.5
+        for: 10m
+        labels:
+          severity: warning
+          service: vllm
+        annotations:
+          summary: "vLLM throughput has degraded"
+          description: "Token throughput has decreased by {{ $value | humanizePercentage }} compared to 1 hour ago."
