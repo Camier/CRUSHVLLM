@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,10 +44,18 @@ func (sm *ServerManager) RestartWithModel(modelID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
+	// Check if already running the requested model
+	if sm.currentModel == modelID && sm.isRunning {
+		return nil // Already running with this model
+	}
+
 	// Stop current server if running
 	if err := sm.stopServer(); err != nil {
 		return fmt.Errorf("failed to stop current server: %w", err)
 	}
+
+	// Wait a moment for port to be released
+	time.Sleep(2 * time.Second)
 
 	// Start new server with the model
 	if err := sm.startServer(modelID); err != nil {
@@ -168,6 +177,11 @@ func (sm *ServerManager) startServer(modelID string) error {
 	// Wait for server to be ready or timeout
 	select {
 	case <-readyChan:
+		// Perform a health check before declaring success
+		if err := sm.healthCheck(); err != nil {
+			sm.stopServer()
+			return fmt.Errorf("health check failed: %w", err)
+		}
 		sm.isRunning = true
 		return nil
 	case err := <-errorChan:
@@ -191,6 +205,25 @@ func (sm *ServerManager) GetCurrentModel() string {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	return sm.currentModel
+}
+
+// healthCheck verifies the server is responding
+func (sm *ServerManager) healthCheck() error {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/health", sm.port))
+	if err != nil {
+		// Try the models endpoint as fallback
+		resp, err = client.Get(fmt.Sprintf("http://localhost:%d/v1/models", sm.port))
+		if err != nil {
+			return fmt.Errorf("server not responding: %w", err)
+		}
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // Shutdown gracefully shuts down the server
