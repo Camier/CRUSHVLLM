@@ -4,5 +4,88 @@
     "Go": {
       "command": "gopls"
     }
+  },
+  "providers": {
+    "vllm": {
+      "name": "vLLM Local",
+      "base_url": "http://localhost:8000/v1/",
+      "type": "openai",
+      "auto_discovery": true,
+      "health_check": {
+        "enabled": true,
+        "interval": 30000,
+        "timeout": 5000
+      },
+      "models": []
+    }
+  },
+  "mcp": {
+    "vllm-model-manager": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-mcp-server@latest",
+        "--type",
+        "model-manager"
+      ],
+      "env": {
+        "VLLM_API_ENDPOINT": "$(echo $VLLM_API_ENDPOINT || echo http://localhost:8000/v1)",
+        "VLLM_API_KEY": "$(echo $VLLM_API_KEY)",
+        "VLLM_TIMEOUT": "30000",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "vllm-state-persistence": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y", 
+        "vllm-state-mcp@latest",
+        "--type",
+        "state-persistence"
+      ],
+      "env": {
+        "STATE_DB_PATH": "./.crush/vllm-state.db",
+        "ENABLE_COMPRESSION": "true",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "vllm-performance-monitor": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-monitor-mcp@latest", 
+        "--type",
+        "performance-monitor"
+      ],
+      "env": {
+        "MONITOR_INTERVAL_MS": "5000",
+        "ENABLE_GPU_MONITORING": "true",
+        "LOG_LEVEL": "info"
+      }
+    }
+  },
+  "permissions": {
+    "allowed_tools": [
+      "view",
+      "ls", 
+      "grep",
+      "edit",
+      "mcp_vllm-model-manager_list-models",
+      "mcp_vllm-model-manager_load-model",
+      "mcp_vllm-model-manager_unload-model",
+      "mcp_vllm-model-manager_get-model-info",
+      "mcp_vllm-state-persistence_save-state",
+      "mcp_vllm-state-persistence_load-state",
+      "mcp_vllm-performance-monitor_get-metrics",
+      "mcp_vllm-performance-monitor_get-gpu-stats"
+    ]
+  },
+  "options": {
+    "debug": true,
+    "vllm_auto_discovery": true,
+    "vllm_health_check_interval": 30000
   }
 }

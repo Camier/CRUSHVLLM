@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "vLLM State Persistence MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-state-mcp@latest",
+        "--type", "state-persistence"
+      ],
+      "env": {
+        "STATE_DB_PATH": "$(echo $STATE_DB_PATH || echo ./.crush/vllm-state.db)",
+        "STATE_DB_TYPE": "$(echo $STATE_DB_TYPE || echo sqlite)",
+        "ENABLE_COMPRESSION": "$(echo $ENABLE_COMPRESSION || echo true)",
+        "COMPRESSION_LEVEL": "$(echo $COMPRESSION_LEVEL || echo 6)",
+        "MAX_HISTORY_SIZE": "$(echo $MAX_HISTORY_SIZE || echo 1000)",
+        "MAX_STATE_SIZE_MB": "$(echo $MAX_STATE_SIZE_MB || echo 100)",
+        "BACKUP_INTERVAL_SECONDS": "$(echo $BACKUP_INTERVAL_SECONDS || echo 300)",
+        "CLEANUP_INTERVAL_HOURS": "$(echo $CLEANUP_INTERVAL_HOURS || echo 24)",
+        "MAX_SESSION_AGE_DAYS": "$(echo $MAX_SESSION_AGE_DAYS || echo 30)",
+        "ENCRYPT_SENSITIVE_DATA": "$(echo $ENCRYPT_SENSITIVE_DATA || echo true)",
+        "ENCRYPTION_KEY": "$(echo $ENCRYPTION_KEY)",
+        "VACUUM_THRESHOLD_MB": "$(echo $VACUUM_THRESHOLD_MB || echo 10)",
+        "LOG_LEVEL": "$(echo $LOG_LEVEL || echo info)",
+        "ENABLE_AUDIT_LOG": "$(echo $ENABLE_AUDIT_LOG || echo true)",
+        "AUDIT_LOG_PATH": "$(echo $AUDIT_LOG_PATH || echo ./.crush/logs/vllm-state-audit.log)"
+      }
+    }
+  }
+}

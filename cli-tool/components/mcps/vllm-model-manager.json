@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "vLLM Model Manager MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-mcp-server@latest",
+        "--type", "model-manager",
+        "--host", "$(echo $VLLM_HOST || echo localhost)",
+        "--port", "$(echo $VLLM_PORT || echo 8000)"
+      ],
+      "env": {
+        "VLLM_API_ENDPOINT": "$(echo $VLLM_API_ENDPOINT || echo http://localhost:8000/v1)",
+        "VLLM_API_KEY": "$(echo $VLLM_API_KEY)",
+        "VLLM_TIMEOUT": "$(echo $VLLM_TIMEOUT || echo 30000)",
+        "VLLM_MAX_RETRIES": "$(echo $VLLM_MAX_RETRIES || echo 3)",
+        "VLLM_MODEL_CACHE_DIR": "$(echo $VLLM_MODEL_CACHE_DIR || echo ~/.cache/huggingface/hub)",
+        "VLLM_GPU_MEMORY_UTILIZATION": "$(echo $VLLM_GPU_MEMORY_UTILIZATION || echo 0.8)",
+        "VLLM_TENSOR_PARALLEL_SIZE": "$(echo $VLLM_TENSOR_PARALLEL_SIZE || echo 1)",
+        "VLLM_PIPELINE_PARALLEL_SIZE": "$(echo $VLLM_PIPELINE_PARALLEL_SIZE || echo 1)",
+        "VLLM_MAX_MODEL_LEN": "$(echo $VLLM_MAX_MODEL_LEN)",
+        "VLLM_QUANTIZATION": "$(echo $VLLM_QUANTIZATION || echo none)",
+        "VLLM_DTYPE": "$(echo $VLLM_DTYPE || echo auto)",
+        "VLLM_ENFORCE_EAGER": "$(echo $VLLM_ENFORCE_EAGER || echo false)",
+        "VLLM_ENABLE_PREFIX_CACHING": "$(echo $VLLM_ENABLE_PREFIX_CACHING || echo true)",
+        "VLLM_ENABLE_CHUNKED_PREFILL": "$(echo $VLLM_ENABLE_CHUNKED_PREFILL || echo false)",
+        "HUGGINGFACE_HUB_TOKEN": "$(echo $HUGGINGFACE_HUB_TOKEN)",
+        "LOG_LEVEL": "$(echo $LOG_LEVEL || echo info)",
+        "ENABLE_METRICS": "$(echo $ENABLE_METRICS || echo true)",
+        "METRICS_PORT": "$(echo $METRICS_PORT || echo 8001)"
+      }
+    }
+  }
+}

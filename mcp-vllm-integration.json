@@ -1,0 +1,109 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "mcpServers": {
+    "vLLM Model Manager MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-mcp-server@latest",
+        "--host",
+        "localhost",
+        "--port",
+        "8000"
+      ],
+      "env": {
+        "VLLM_HOST": "localhost",
+        "VLLM_PORT": "8000",
+        "VLLM_API_KEY": "",
+        "VLLM_TIMEOUT": "30000",
+        "VLLM_MAX_RETRIES": "3",
+        "VLLM_ENABLE_METRICS": "true",
+        "VLLM_MODEL_CACHE_DIR": "/models",
+        "VLLM_GPU_MEMORY_UTILIZATION": "0.8",
+        "VLLM_TENSOR_PARALLEL_SIZE": "1",
+        "VLLM_PIPELINE_PARALLEL_SIZE": "1"
+      }
+    },
+    "vLLM State Persistence MCP": {
+      "command": "npx", 
+      "args": [
+        "-y",
+        "vllm-state-mcp@latest"
+      ],
+      "env": {
+        "STATE_DB_PATH": "./.crush/vllm-state.db",
+        "ENABLE_COMPRESSION": "true",
+        "MAX_HISTORY_SIZE": "1000",
+        "BACKUP_INTERVAL": "300"
+      }
+    },
+    "vLLM Performance Monitor MCP": {
+      "command": "npx",
+      "args": [
+        "-y", 
+        "vllm-monitor-mcp@latest"
+      ],
+      "env": {
+        "MONITOR_INTERVAL": "5000",
+        "METRICS_ENDPOINT": "http://localhost:8000/metrics",
+        "ALERT_THRESHOLD_GPU": "95",
+        "ALERT_THRESHOLD_MEMORY": "90",
+        "LOG_LEVEL": "info"
+      }
+    }
+  },
+  "providers": {
+    "vllm": {
+      "name": "vLLM Local",
+      "base_url": "http://localhost:8000/v1/", 
+      "type": "openai",
+      "models": [
+        {
+          "id": "meta-llama/Llama-3.1-8B-Instruct",
+          "name": "Llama 3.1 8B Instruct",
+          "context_window": 128000,
+          "default_max_tokens": 4096,
+          "supports_attachments": false,
+          "can_reason": true
+        },
+        {
+          "id": "meta-llama/Llama-3.1-70B-Instruct", 
+          "name": "Llama 3.1 70B Instruct",
+          "context_window": 128000,
+          "default_max_tokens": 4096,
+          "supports_attachments": false,
+          "can_reason": true
+        },
+        {
+          "id": "microsoft/DialoGPT-large",
+          "name": "DialoGPT Large",
+          "context_window": 1024,
+          "default_max_tokens": 512,
+          "supports_attachments": false,
+          "can_reason": false
+        }
+      ]
+    }
+  },
+  "permissions": {
+    "allowed_tools": [
+      "mcp_vllm-model-manager_list-models",
+      "mcp_vllm-model-manager_load-model",
+      "mcp_vllm-model-manager_unload-model", 
+      "mcp_vllm-model-manager_get-model-info",
+      "mcp_vllm-model-manager_set-model-config",
+      "mcp_vllm-state-persistence_save-state",
+      "mcp_vllm-state-persistence_load-state",
+      "mcp_vllm-state-persistence_clear-state",
+      "mcp_vllm-performance-monitor_get-metrics",
+      "mcp_vllm-performance-monitor_get-gpu-stats",
+      "mcp_vllm-performance-monitor_get-memory-stats"
+    ]
+  },
+  "options": {
+    "debug": true,
+    "debug_mcp": true,
+    "vllm_auto_discovery": true,
+    "vllm_health_check_interval": 30000
+  }
+}

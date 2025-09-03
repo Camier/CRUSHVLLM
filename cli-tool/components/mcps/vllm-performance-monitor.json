@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "vLLM Performance Monitor MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-monitor-mcp@latest",
+        "--type", "performance-monitor"
+      ],
+      "env": {
+        "MONITOR_INTERVAL_MS": "$(echo $MONITOR_INTERVAL_MS || echo 5000)",
+        "METRICS_ENDPOINT": "$(echo $METRICS_ENDPOINT || echo http://localhost:8000/metrics)",
+        "VLLM_API_ENDPOINT": "$(echo $VLLM_API_ENDPOINT || echo http://localhost:8000/v1)",
+        "PROMETHEUS_ENDPOINT": "$(echo $PROMETHEUS_ENDPOINT)",
+        "ENABLE_GPU_MONITORING": "$(echo $ENABLE_GPU_MONITORING || echo true)",
+        "ENABLE_MEMORY_MONITORING": "$(echo $ENABLE_MEMORY_MONITORING || echo true)",
+        "ENABLE_THROUGHPUT_MONITORING": "$(echo $ENABLE_THROUGHPUT_MONITORING || echo true)",
+        "ALERT_THRESHOLD_GPU_UTIL": "$(echo $ALERT_THRESHOLD_GPU_UTIL || echo 95)",
+        "ALERT_THRESHOLD_MEMORY_UTIL": "$(echo $ALERT_THRESHOLD_MEMORY_UTIL || echo 90)",
+        "ALERT_THRESHOLD_LATENCY_P99": "$(echo $ALERT_THRESHOLD_LATENCY_P99 || echo 5000)",
+        "ALERT_THRESHOLD_ERROR_RATE": "$(echo $ALERT_THRESHOLD_ERROR_RATE || echo 0.05)",
+        "ALERT_THRESHOLD_TEMP": "$(echo $ALERT_THRESHOLD_TEMP || echo 80)",
+        "METRICS_RETENTION_HOURS": "$(echo $METRICS_RETENTION_HOURS || echo 24)",
+        "METRICS_AGGREGATION_WINDOW": "$(echo $METRICS_AGGREGATION_WINDOW || echo 60)",
+        "ENABLE_NVIDIA_SMI": "$(echo $ENABLE_NVIDIA_SMI || echo true)",
+        "NVIDIA_SMI_PATH": "$(echo $NVIDIA_SMI_PATH || echo nvidia-smi)",
+        "ENABLE_ALERTS": "$(echo $ENABLE_ALERTS || echo true)",
+        "ALERT_WEBHOOK_URL": "$(echo $ALERT_WEBHOOK_URL)",
+        "ALERT_EMAIL_SMTP": "$(echo $ALERT_EMAIL_SMTP)",
+        "ALERT_EMAIL_FROM": "$(echo $ALERT_EMAIL_FROM)",
+        "ALERT_EMAIL_TO": "$(echo $ALERT_EMAIL_TO)",
+        "LOG_LEVEL": "$(echo $LOG_LEVEL || echo info)",
+        "METRICS_DB_PATH": "$(echo $METRICS_DB_PATH || echo ./.crush/vllm-metrics.db)",
+        "EXPORT_PROMETHEUS_FORMAT": "$(echo $EXPORT_PROMETHEUS_FORMAT || echo true)",
+        "EXPORT_GRAFANA_FORMAT": "$(echo $EXPORT_GRAFANA_FORMAT || echo false)",
+        "CUSTOM_METRICS_CONFIG": "$(echo $CUSTOM_METRICS_CONFIG)",
+        "BENCHMARK_MODE": "$(echo $BENCHMARK_MODE || echo false)",
+        "PROFILING_ENABLED": "$(echo $PROFILING_ENABLED || echo false)"
+      }
+    }
+  }
+}

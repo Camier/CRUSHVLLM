@@ -1,0 +1,441 @@
+{
+  "tools": {
+    "vllm_model_manager": {
+      "name": "vLLM Model Manager",
+      "description": "Manage vLLM models - load, unload, configure, and monitor model lifecycle",
+      "mcp_server": "vLLM Model Manager MCP",
+      "operations": {
+        "list_models": {
+          "name": "mcp_vllm-model-manager_list-models",
+          "description": "List all available vLLM models with their current status",
+          "parameters": {
+            "include_unloaded": {
+              "type": "boolean",
+              "description": "Include unloaded models in the response",
+              "default": true
+            },
+            "filter_by_status": {
+              "type": "string", 
+              "enum": ["all", "loaded", "unloaded", "loading", "error"],
+              "description": "Filter models by their current status",
+              "default": "all"
+            }
+          },
+          "returns": {
+            "type": "object",
+            "properties": {
+              "models": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "status": {"type": "string"},
+                    "memory_usage_mb": {"type": "number"},
+                    "context_window": {"type": "number"},
+                    "capabilities": {"type": "object"}
+                  }
+                }
+              },
+              "total_count": {"type": "number"},
+              "loaded_count": {"type": "number"}
+            }
+          }
+        },
+        "load_model": {
+          "name": "mcp_vllm-model-manager_load-model", 
+          "description": "Load a model into vLLM with specified configuration",
+          "parameters": {
+            "model_id": {
+              "type": "string",
+              "description": "HuggingFace model identifier (e.g. meta-llama/Llama-3.1-8B-Instruct)",
+              "required": true
+            },
+            "tensor_parallel_size": {
+              "type": "integer",
+              "description": "Number of GPUs to use for tensor parallelism",
+              "default": 1,
+              "minimum": 1,
+              "maximum": 8
+            },
+            "pipeline_parallel_size": {
+              "type": "integer", 
+              "description": "Number of pipeline parallel stages",
+              "default": 1,
+              "minimum": 1,
+              "maximum": 8
+            },
+            "gpu_memory_utilization": {
+              "type": "number",
+              "description": "Fraction of GPU memory to use",
+              "default": 0.8,
+              "minimum": 0.1,
+              "maximum": 0.95
+            },
+            "max_model_len": {
+              "type": "integer",
+              "description": "Maximum sequence length for the model",
+              "minimum": 512
+            },
+            "quantization": {
+              "type": "string",
+              "enum": ["none", "awq", "gptq", "squeezellm", "fp8"],
+              "description": "Quantization method to use",
+              "default": "none"
+            },
+            "dtype": {
+              "type": "string",
+              "enum": ["auto", "half", "float16", "bfloat16", "float32"],
+              "description": "Data type for model weights",
+              "default": "auto"
+            },
+            "enforce_eager": {
+              "type": "boolean",
+              "description": "Disable CUDA graph optimization",
+              "default": false
+            },
+            "enable_prefix_caching": {
+              "type": "boolean", 
+              "description": "Enable prefix caching for faster inference",
+              "default": true
+            }
+          },
+          "returns": {
+            "type": "object",
+            "properties": {
+              "success": {"type": "boolean"},
+              "model_id": {"type": "string"},
+              "status": {"type": "string"},
+              "estimated_load_time_seconds": {"type": "number"},
+              "memory_required_mb": {"type": "number"},
+              "error": {"type": "object", "optional": true}
+            }
+          }
+        },
+        "unload_model": {
+          "name": "mcp_vllm-model-manager_unload-model",
+          "description": "Unload a model from vLLM to free GPU memory",
+          "parameters": {
+            "model_id": {
+              "type": "string", 
+              "description": "Model identifier to unload",
+              "required": true
+            },
+            "force": {
+              "type": "boolean",
+              "description": "Force unload even if model is actively being used",
+              "default": false
+            }
+          },
+          "returns": {
+            "type": "object",
+            "properties": {
+              "success": {"type": "boolean"},
+              "model_id": {"type": "string"},
+              "status": {"type": "string"},
+              "memory_freed_mb": {"type": "number"},
+              "error": {"type": "object", "optional": true}
+            }
+          }
+        },
+        "get_model_info": {
+          "name": "mcp_vllm-model-manager_get-model-info",
+          "description": "Get detailed information about a specific model",
+          "parameters": {
+            "model_id": {
+              "type": "string",
+              "description": "Model identifier to get information for", 
+              "required": true
+            },
+            "include_performance": {
+              "type": "boolean",
+              "description": "Include real-time performance metrics",
+              "default": true
+            }
+          },
+          "returns": {
+            "type": "object",
+            "properties": {
+              "model_id": {"type": "string"},
+              "name": {"type": "string"},
+              "status": {"type": "string"},
+              "config": {"type": "object"},
+              "performance": {"type": "object", "optional": true},
+              "capabilities": {"type": "object"},
+              "metadata": {"type": "object"}
+            }
+          }
+        }
+      }
+    },
+    "vllm_state_persistence": {
+      "name": "vLLM State Persistence",
+      "description": "Save and restore vLLM session state including models and configurations",
+      "mcp_server": "vLLM State Persistence MCP",
+      "operations": {
+        "save_state": {
+          "name": "mcp_vllm-state-persistence_save-state",
+          "description": "Save current vLLM state to persistent storage",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "description": "Unique session identifier",
+              "required": true
+            },
+            "include_models": {
+              "type": "boolean",
+              "description": "Include loaded model states",
+              "default": true
+            },
+            "include_conversations": {
+              "type": "boolean",
+              "description": "Include conversation history",
+              "default": true
+            },
+            "include_metrics": {
+              "type": "boolean",
+              "description": "Include performance metrics",
+              "default": false
+            },
+            "compression": {
+              "type": "boolean",
+              "description": "Compress state data",
+              "default": true
+            },
+            "description": {
+              "type": "string", 
+              "description": "Optional description for this state snapshot"
+            }
+          },
+          "returns": {
+            "type": "object",
+            "properties": {
+              "success": {"type": "boolean"},
+              "session_id": {"type": "string"},
+              "state_id": {"type": "string"},
+              "size_bytes": {"type": "number"},
+              "timestamp": {"type": "string"},
+              "error": {"type": "object", "optional": true}
+            }
+          }
+        },
+        "load_state": {
+          "name": "mcp_vllm-state-persistence_load-state",
+          "description": "Restore vLLM state from persistent storage",
+          "parameters": {
+            "session_id": {
+              "type": "string",
+              "description": "Session identifier to restore",
+              "required": true
+            },
+            "state_id": {
+              "type": "string",
+              "description": "Specific state snapshot to restore (optional - uses latest if not provided)"
+            },
+            "restore_models": {
+              "type": "boolean",
+              "description": "Restore loaded model states",
+              "default": true
+            },
+            "restore_conversations": {
+              "type": "boolean",
+              "description": "Restore conversation history",
+              "default": true
+            }
+          },
+          "returns": {
+            "type": "object",
+            "properties": {
+              "success": {"type": "boolean"},
+              "session_id": {"type": "string"},
+              "restored": {
+                "type": "object",
+                "properties": {
+                  "models": {"type": "number"},
+                  "conversations": {"type": "number"},
+                  "configurations": {"type": "number"}
+                }
+              },
+              "timestamp": {"type": "string"},
+              "error": {"type": "object", "optional": true}
+            }
+          }
+        }
+      }
+    },
+    "vllm_performance_monitor": {
+      "name": "vLLM Performance Monitor",
+      "description": "Monitor vLLM performance, GPU utilization, and system metrics",
+      "mcp_server": "vLLM Performance Monitor MCP",
+      "operations": {
+        "get_metrics": {
+          "name": "mcp_vllm-performance-monitor_get-metrics",
+          "description": "Get comprehensive performance metrics",
+          "parameters": {
+            "duration_seconds": {
+              "type": "integer",
+              "description": "Time window for metrics collection",
+              "default": 60,
+              "minimum": 5,
+              "maximum": 3600
+            },
+            "include_history": {
+              "type": "boolean",
+              "description": "Include historical data points",
+              "default": false
+            },
+            "metrics": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["throughput", "latency", "memory", "gpu", "requests", "errors"]
+              },
+              "description": "Specific metrics to collect",
+              "default": ["throughput", "latency", "memory", "gpu"]
+            }
+          },
+          "returns": {
+            "type": "object",
+            "properties": {
+              "timestamp": {"type": "string"},
+              "duration_seconds": {"type": "number"},
+              "metrics": {
+                "type": "object",
+                "properties": {
+                  "throughput": {"type": "object"},
+                  "latency": {"type": "object"},
+                  "memory": {"type": "object"},
+                  "gpu": {"type": "object"},
+                  "requests": {"type": "object"}
+                }
+              },
+              "alerts": {"type": "array", "optional": true}
+            }
+          }
+        },
+        "get_gpu_stats": {
+          "name": "mcp_vllm-performance-monitor_get-gpu-stats",
+          "description": "Get detailed GPU utilization statistics",
+          "parameters": {
+            "gpu_ids": {
+              "type": "array",
+              "items": {"type": "integer"},
+              "description": "Specific GPU IDs to query (default: all)"
+            },
+            "include_temperature": {
+              "type": "boolean",
+              "description": "Include temperature readings",
+              "default": true
+            },
+            "include_power": {
+              "type": "boolean", 
+              "description": "Include power consumption data",
+              "default": true
+            },
+            "include_processes": {
+              "type": "boolean",
+              "description": "Include running process information",
+              "default": false
+            }
+          },
+          "returns": {
+            "type": "object",
+            "properties": {
+              "timestamp": {"type": "string"},
+              "gpus": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "memory": {"type": "object"},
+                    "compute": {"type": "object"},
+                    "temperature": {"type": "object", "optional": true},
+                    "power": {"type": "object", "optional": true}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tool_groups": {
+    "vllm_core": {
+      "name": "vLLM Core Operations",
+      "description": "Essential vLLM model management operations",
+      "tools": [
+        "mcp_vllm-model-manager_list-models",
+        "mcp_vllm-model-manager_load-model", 
+        "mcp_vllm-model-manager_unload-model",
+        "mcp_vllm-model-manager_get-model-info"
+      ],
+      "auto_allow": false
+    },
+    "vllm_state": {
+      "name": "vLLM State Management",
+      "description": "Session state persistence and recovery",
+      "tools": [
+        "mcp_vllm-state-persistence_save-state",
+        "mcp_vllm-state-persistence_load-state"
+      ],
+      "auto_allow": false
+    },
+    "vllm_monitoring": {
+      "name": "vLLM Performance Monitoring", 
+      "description": "Performance metrics and system monitoring",
+      "tools": [
+        "mcp_vllm-performance-monitor_get-metrics",
+        "mcp_vllm-performance-monitor_get-gpu-stats"
+      ],
+      "auto_allow": true
+    }
+  },
+  "workflows": {
+    "switch_model": {
+      "name": "Switch vLLM Model",
+      "description": "Safely switch from one model to another with state preservation",
+      "steps": [
+        {
+          "tool": "mcp_vllm-state-persistence_save-state",
+          "description": "Save current session state"
+        },
+        {
+          "tool": "mcp_vllm-performance-monitor_get-metrics",
+          "description": "Check current system performance"
+        },
+        {
+          "tool": "mcp_vllm-model-manager_load-model",
+          "description": "Load new model with optimal configuration"
+        },
+        {
+          "tool": "mcp_vllm-model-manager_unload-model", 
+          "description": "Unload previous model if needed",
+          "condition": "resource_pressure"
+        }
+      ]
+    },
+    "optimize_performance": {
+      "name": "Optimize vLLM Performance",
+      "description": "Analyze and optimize vLLM performance based on current metrics",
+      "steps": [
+        {
+          "tool": "mcp_vllm-performance-monitor_get-metrics",
+          "description": "Collect current performance metrics"
+        },
+        {
+          "tool": "mcp_vllm-performance-monitor_get-gpu-stats",
+          "description": "Get detailed GPU utilization"
+        },
+        {
+          "tool": "mcp_vllm-model-manager_list-models",
+          "description": "Check loaded models"
+        }
+      ],
+      "analysis": "automatic_optimization_recommendations"
+    }
+  }
+}

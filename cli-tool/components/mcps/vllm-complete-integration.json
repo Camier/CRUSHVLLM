@@ -1,0 +1,100 @@
+{
+  "mcpServers": {
+    "vLLM Model Manager MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-mcp-server@latest",
+        "--type", "model-manager",
+        "--host", "$(echo $VLLM_HOST || echo localhost)",
+        "--port", "$(echo $VLLM_PORT || echo 8000)"
+      ],
+      "env": {
+        "VLLM_API_ENDPOINT": "$(echo $VLLM_API_ENDPOINT || echo http://localhost:8000/v1)",
+        "VLLM_API_KEY": "$(echo $VLLM_API_KEY)",
+        "VLLM_TIMEOUT": "30000",
+        "VLLM_MAX_RETRIES": "3",
+        "VLLM_MODEL_CACHE_DIR": "$(echo $VLLM_MODEL_CACHE_DIR || echo ~/.cache/huggingface/hub)",
+        "VLLM_GPU_MEMORY_UTILIZATION": "0.8",
+        "HUGGINGFACE_HUB_TOKEN": "$(echo $HUGGINGFACE_HUB_TOKEN)",
+        "LOG_LEVEL": "info",
+        "ENABLE_METRICS": "true"
+      }
+    },
+    "vLLM State Persistence MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-state-mcp@latest",
+        "--type", "state-persistence"
+      ],
+      "env": {
+        "STATE_DB_PATH": "./.crush/vllm-state.db",
+        "ENABLE_COMPRESSION": "true",
+        "MAX_HISTORY_SIZE": "1000",
+        "BACKUP_INTERVAL_SECONDS": "300",
+        "MAX_SESSION_AGE_DAYS": "30",
+        "ENCRYPT_SENSITIVE_DATA": "true",
+        "ENCRYPTION_KEY": "$(echo $VLLM_ENCRYPTION_KEY)",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "vLLM Performance Monitor MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-monitor-mcp@latest",
+        "--type", "performance-monitor"
+      ],
+      "env": {
+        "MONITOR_INTERVAL_MS": "5000",
+        "METRICS_ENDPOINT": "$(echo $VLLM_API_ENDPOINT || echo http://localhost:8000)/metrics",
+        "VLLM_API_ENDPOINT": "$(echo $VLLM_API_ENDPOINT || echo http://localhost:8000/v1)",
+        "ENABLE_GPU_MONITORING": "true",
+        "ALERT_THRESHOLD_GPU_UTIL": "95",
+        "ALERT_THRESHOLD_MEMORY_UTIL": "90",
+        "ALERT_THRESHOLD_LATENCY_P99": "5000",
+        "METRICS_RETENTION_HOURS": "24",
+        "ENABLE_NVIDIA_SMI": "true",
+        "ENABLE_ALERTS": "true",
+        "LOG_LEVEL": "info",
+        "METRICS_DB_PATH": "./.crush/vllm-metrics.db"
+      }
+    },
+    "vLLM Auto Discovery MCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "vllm-discovery-mcp@latest"
+      ],
+      "env": {
+        "DISCOVERY_ENDPOINTS": "$(echo $VLLM_DISCOVERY_ENDPOINTS || echo http://localhost:8000/v1)",
+        "DISCOVERY_INTERVAL_SECONDS": "60",
+        "HUGGINGFACE_API_TOKEN": "$(echo $HUGGINGFACE_HUB_TOKEN)",
+        "ENABLE_MODEL_METADATA_ENRICHMENT": "true",
+        "CACHE_MODEL_METADATA": "true",
+        "METADATA_CACHE_TTL_HOURS": "24",
+        "ENABLE_CAPABILITY_DETECTION": "true",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "vLLM Resource Optimizer MCP": {
+      "command": "npx", 
+      "args": [
+        "-y",
+        "vllm-optimizer-mcp@latest"
+      ],
+      "env": {
+        "OPTIMIZATION_INTERVAL_SECONDS": "30",
+        "AUTO_SCALING_ENABLED": "true",
+        "MIN_GPU_UTILIZATION": "0.3",
+        "MAX_GPU_UTILIZATION": "0.9",
+        "ENABLE_PREDICTIVE_LOADING": "true",
+        "UNLOAD_IDLE_MODELS_MINUTES": "15",
+        "RESOURCE_PREDICTION_WINDOW_MINUTES": "5",
+        "ENABLE_BATCH_OPTIMIZATION": "true",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
