@@ -605,10 +605,7 @@ func (p *chatPage) SetSize(width, height int) tea.Cmd {
 }
 
 func (p *chatPage) newSession() tea.Cmd {
-	if p.session.ID == "" {
-		return nil
-	}
-
+	// Clear the current session
 	p.session = session.Session{}
 	p.focusedPane = PanelTypeEditor
 	p.editor.Focus()
