@@ -31,6 +31,7 @@ import (
 	"github.com/charmbracelet/crush/internal/tui/page/chat"
 	"github.com/charmbracelet/crush/internal/tui/styles"
 	"github.com/charmbracelet/crush/internal/tui/util"
+	"github.com/charmbracelet/crush/internal/vllm"
 	"github.com/charmbracelet/lipgloss/v2"
 )
 
@@ -196,6 +197,41 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.app.CoderAgent.IsBusy() {
 			return a, util.ReportWarn("Agent is busy, please wait...")
 		}
+		
+		// Check if this is a vLLM provider model that requires server restart
+		if msg.Model.Provider == "vllm" && a.app.VLLMServer != nil {
+			// Send status that we're restarting the server
+			a.app.Events <- vllm.ServerStatusMsg{
+				Status:    vllm.ServerStatusStopping,
+				ModelID:   msg.Model.Model,
+				Message:   "Restarting vLLM server with new model...",
+				Timestamp: time.Now(),
+			}
+			
+			// Restart server in background
+			go func() {
+				startTime := time.Now()
+				err := a.app.VLLMServer.RestartWithModel(msg.Model.Model)
+				duration := time.Since(startTime)
+				
+				if err != nil {
+					a.app.Events <- vllm.ServerStatusMsg{
+						Status:    vllm.ServerStatusError,
+						ModelID:   msg.Model.Model,
+						Message:   fmt.Sprintf("Failed to restart server: %v", err),
+						Error:     err,
+						Timestamp: time.Now(),
+					}
+				} else {
+					a.app.Events <- vllm.ServerRestartCompleteMsg{
+						ModelID:   msg.Model.Model,
+						Duration:  duration,
+						Timestamp: time.Now(),
+					}
+				}
+			}()
+		}
+		
 		config.Get().UpdatePreferredModel(msg.ModelType, msg.Model)
 
 		// Update the agent with the new model/provider configuration
@@ -206,6 +242,10 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		modelTypeName := "large"
 		if msg.ModelType == config.SelectedModelTypeSmall {
 			modelTypeName = "small"
+		}
+		
+		if msg.Model.Provider == "vllm" {
+			return a, util.ReportInfo(fmt.Sprintf("%s model changing to %s (restarting server...)", modelTypeName, msg.Model.Model))
 		}
 		return a, util.ReportInfo(fmt.Sprintf("%s model changed to %s", modelTypeName, msg.Model.Model))
 
@@ -279,6 +319,24 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return a, tea.Batch(cmds...)
+	
+	// vLLM Server Events
+	case vllm.ServerStatusMsg:
+		switch msg.Status {
+		case vllm.ServerStatusStopping:
+			return a, util.ReportInfo(msg.Message)
+		case vllm.ServerStatusStarting:
+			return a, util.ReportInfo(fmt.Sprintf("Starting vLLM server with model %s...", msg.ModelID))
+		case vllm.ServerStatusError:
+			return a, util.ReportError(msg.Error)
+		case vllm.ServerStatusRunning:
+			return a, util.ReportInfo(fmt.Sprintf("vLLM server running with model %s", msg.ModelID))
+		}
+		return a, nil
+	
+	case vllm.ServerRestartCompleteMsg:
+		return a, util.ReportInfo(fmt.Sprintf("✓ vLLM server restarted with model %s (took %v)", msg.ModelID, msg.Duration))
+	
 	case splash.OnboardingCompleteMsg:
 		item, ok := a.pages[a.currentPage]
 		if !ok {

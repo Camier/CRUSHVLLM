@@ -16,9 +16,11 @@ type LazySlice[K any] struct {
 // to populate it.
 func NewLazySlice[K any](load func() []K) *LazySlice[K] {
 	s := &LazySlice[K]{}
-	s.wg.Go(func() {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
 		s.inner = load()
-	})
+	}()
 	return s
 }
 

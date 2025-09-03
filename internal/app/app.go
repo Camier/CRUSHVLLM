@@ -24,6 +24,7 @@ import (
 	"github.com/charmbracelet/crush/internal/message"
 	"github.com/charmbracelet/crush/internal/permission"
 	"github.com/charmbracelet/crush/internal/session"
+	"github.com/charmbracelet/crush/internal/vllm"
 )
 
 type App struct {
@@ -35,6 +36,8 @@ type App struct {
 	CoderAgent agent.Service
 
 	LSPClients map[string]*lsp.Client
+	
+	VLLMServer *vllm.ServerManager
 
 	clientsMutex sync.RWMutex
 
@@ -45,7 +48,7 @@ type App struct {
 
 	serviceEventsWG *sync.WaitGroup
 	eventsCtx       context.Context
-	events          chan tea.Msg
+	Events          chan tea.Msg // Exported for vLLM server status updates
 	tuiWG           *sync.WaitGroup
 
 	// global context and cleanup functions
@@ -71,6 +74,7 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 		History:     files,
 		Permissions: permission.NewPermissionService(cfg.WorkingDir(), skipPermissionsRequests, allowedTools),
 		LSPClients:  make(map[string]*lsp.Client),
+		VLLMServer:  vllm.NewServerManager("", 8000),
 
 		globalCtx: ctx,
 
@@ -78,7 +82,7 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 
 		watcherCancelFuncs: csync.NewSlice[context.CancelFunc](),
 
-		events:          make(chan tea.Msg, 100),
+		Events:          make(chan tea.Msg, 100),
 		serviceEventsWG: &sync.WaitGroup{},
 		tuiWG:           &sync.WaitGroup{},
 	}
@@ -214,13 +218,13 @@ func (app *App) UpdateAgentModel() error {
 func (app *App) setupEvents() {
 	ctx, cancel := context.WithCancel(app.globalCtx)
 	app.eventsCtx = ctx
-	setupSubscriber(ctx, app.serviceEventsWG, "sessions", app.Sessions.Subscribe, app.events)
-	setupSubscriber(ctx, app.serviceEventsWG, "messages", app.Messages.Subscribe, app.events)
-	setupSubscriber(ctx, app.serviceEventsWG, "permissions", app.Permissions.Subscribe, app.events)
-	setupSubscriber(ctx, app.serviceEventsWG, "permissions-notifications", app.Permissions.SubscribeNotifications, app.events)
-	setupSubscriber(ctx, app.serviceEventsWG, "history", app.History.Subscribe, app.events)
-	setupSubscriber(ctx, app.serviceEventsWG, "mcp", agent.SubscribeMCPEvents, app.events)
-	setupSubscriber(ctx, app.serviceEventsWG, "lsp", SubscribeLSPEvents, app.events)
+	setupSubscriber(ctx, app.serviceEventsWG, "sessions", app.Sessions.Subscribe, app.Events)
+	setupSubscriber(ctx, app.serviceEventsWG, "messages", app.Messages.Subscribe, app.Events)
+	setupSubscriber(ctx, app.serviceEventsWG, "permissions", app.Permissions.Subscribe, app.Events)
+	setupSubscriber(ctx, app.serviceEventsWG, "permissions-notifications", app.Permissions.SubscribeNotifications, app.Events)
+	setupSubscriber(ctx, app.serviceEventsWG, "history", app.History.Subscribe, app.Events)
+	setupSubscriber(ctx, app.serviceEventsWG, "mcp", agent.SubscribeMCPEvents, app.Events)
+	setupSubscriber(ctx, app.serviceEventsWG, "lsp", SubscribeLSPEvents, app.Events)
 	cleanupFunc := func() {
 		cancel()
 		app.serviceEventsWG.Wait()
@@ -235,7 +239,9 @@ func setupSubscriber[T any](
 	subscriber func(context.Context) <-chan pubsub.Event[T],
 	outputCh chan<- tea.Msg,
 ) {
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		subCh := subscriber(ctx)
 		for {
 			select {
@@ -258,7 +264,7 @@ func setupSubscriber[T any](
 				return
 			}
 		}
-	})
+	}()
 }
 
 func (app *App) InitCoderAgent() error {
@@ -284,7 +290,7 @@ func (app *App) InitCoderAgent() error {
 	// Add MCP client cleanup to shutdown process
 	app.cleanupFuncs = append(app.cleanupFuncs, agent.CloseMCPClients)
 
-	setupSubscriber(app.eventsCtx, app.serviceEventsWG, "coderAgent", app.CoderAgent.Subscribe, app.events)
+	setupSubscriber(app.eventsCtx, app.serviceEventsWG, "coderAgent", app.CoderAgent.Subscribe, app.Events)
 	return nil
 }
 
@@ -309,7 +315,7 @@ func (app *App) Subscribe(program *tea.Program) {
 		case <-tuiCtx.Done():
 			slog.Debug("TUI message handler shutting down")
 			return
-		case msg, ok := <-app.events:
+		case msg, ok := <-app.Events:
 			if !ok {
 				slog.Debug("TUI message channel closed")
 				return
@@ -323,6 +329,13 @@ func (app *App) Subscribe(program *tea.Program) {
 func (app *App) Shutdown() {
 	if app.CoderAgent != nil {
 		app.CoderAgent.CancelAll()
+	}
+
+	// Shutdown vLLM server if running
+	if app.VLLMServer != nil {
+		if err := app.VLLMServer.Shutdown(); err != nil {
+			slog.Error("Failed to shutdown vLLM server", "error", err)
+		}
 	}
 
 	for cancel := range app.watcherCancelFuncs.Seq() {
